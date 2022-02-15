@@ -5,8 +5,7 @@ from utils.common.project_paths import GetPaths
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 
 def build_dataloader(df, cfg, mode):
@@ -31,130 +30,78 @@ def build_dataloader(df, cfg, mode):
     return dataloader
 
 
-def get_transforms(cfg):
-    """
-    Augmentation에 적용할 요소들을 Dictionary 형태로 감싸 Return합니다.
-    :return:
-    """
-    transforms = {
-        'train':
-            A.Compose([
-                A.VerticalFlip(),
-                A.HorizontalFlip(),
-                A.ColorJitter(p=0.8),
-                A.Normalize(),
-                A.LongestMaxSize(max_size=cfg.DATA.IMAGE_SIZE),
-                A.PadIfNeeded(min_height=cfg.DATA.IMAGE_SIZE, min_width=cfg.DATA.IMAGE_SIZE,
-                              border_mode=cv2.BORDER_CONSTANT, p=0.5),
-                # A.RandomCrop(height=config.IMAGE_SIZE, width=config.IMAGE_SIZE, p=0.5),
-                A.Resize(cfg.DATA.IMAGE_SIZE, cfg.DATA.IMAGE_SIZE),
-                ToTensorV2()
-            ]),
-        'valid':
-            A.Compose([
-                A.Normalize(),
-                A.LongestMaxSize(max_size=cfg.DATA.IMAGE_SIZE),
-                A.PadIfNeeded(min_height=cfg.DATA.IMAGE_SIZE, min_width=cfg.DATA.IMAGE_SIZE,
-                              border_mode=cv2.BORDER_CONSTANT, p=1),
-                ToTensorV2()
-            ]),
-        'test':
-            A.Compose([
-                A.Normalize(),
-                A.LongestMaxSize(max_size=cfg.DATA.IMAGE_SIZE),
-                A.PadIfNeeded(min_height=cfg.DATA.IMAGE_SIZE, min_width=cfg.DATA.IMAGE_SIZE,
-                              border_mode=cv2.BORDER_CONSTANT, p=1),
-                ToTensorV2()
-            ])
-    }
-    return transforms
-
-
 class CustomDataset(Dataset):
     """
     Dataset을 만드는 클래스입니다.
     param train: train, validation에는 True를, Inference에는 False를 주면 됩니다.
     """
-    def __init__(self, df, transform, train=True):
-        self.raw_data = df
+    def __init__(self, df,  train=True):
+        self.df = df
         self.train = train
-        self.df = self._preprocess()
-        self.transform = transform
+        self.name_cls_map, cls_name_map = self.maps()
+        self.tokenizer = AutoTokenizer.from_pretrained('klue/roberta-large')
 
     def __len__(self):
         return len(self.df)
 
     def __getitem__(self, idx):
-        image_path = self.df.loc[idx, 'image']
-        image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        image = self.transform(image=image)['image']
-
+        line = self.df.iloc[idx]
+        text = line['premise'] + ' ' + self.tokenizer.sep_token + ' ' + line['hypothesis']
         if self.train:
-            label = self.df.loc[idx, 'cls']
-            return image, label
+            label = self.name_cls_map[line['label']]
+            return text, label
         else:
-            return image
+            return text
 
-    def _preprocess(self):
-        """
-        데이터프레임 전처리 함수입니다.
-        :return:
-        """
-        df = self.raw_data.copy()
-        image_with_path = []
+    def maps(self):
+        name_cls_map = {}
+        cls_name_map = {}
+        labels = sorted(list(set(self.raw_data['label'])))
+        for idx, i in enumerate(labels):
+            name_cls_map[idx] = i
+            cls_name_map[i] = idx
+        return name_cls_map, cls_name_map
 
-        if self.train:
-            for file_name, cls_name in zip(self.raw_data['image'], self.raw_data['cls_name']):
-                image_with_path.append(GetPaths.get_data_folder('train', f'{cls_name}', file_name))
-        else:
-            for file_name in self.raw_data['image']:
-                image_with_path.append(GetPaths.get_data_folder('test', file_name))
-        df['image'] = image_with_path
-        return df
-
-
-class PetFinderDataModule(LightningDataModule):
-    """Data module of Petfinder profiles."""
-    def __init__(self, train_df=None, valid_df=None, test_df=None, cfg=None):
-        super().__init__()
-        self._train_df = train_df
-        self._valid_df = valid_df
-        self._test_df = test_df
-        self._cfg = cfg
-        self.trans = get_default_transforms()
-        self.ttas = get_tta_transforms()
-
-    def __create_dataset(self, mode='train'):
-        if mode == 'train':
-            return PetFinderDataset(self._train_df, train=True, transform=self.trans['train'])
-        elif mode == 'valid':
-            return PetFinderDataset(self._valid_df, train=True, transform=self.trans['valid'])
-        elif mode == 'test':
-            return PetFinderDataset(self._test_df, train=False, transform=self.trans['test'], tta=self.ttas)
-        elif mode == 'predict':
-            return PetFinderDataset(self._train_df, train=False, predict=True, transform=self.trans['test'], tta=self.ttas)
-
-    def train_dataloader(self):
-        dataset = self.__create_dataset('train')
-        return DataLoader(dataset, **self._cfg.train_loader)
-
-    def val_dataloader(self):
-        dataset = self.__create_dataset('valid')
-        return DataLoader(dataset, **self._cfg.valid_loader)
-
-    def predict_dataloader(self):
-        dataset = self.__create_dataset('predict')
-        return DataLoader(dataset, **self._cfg.test_loader)
-
-    def test_dataloader(self):
-        dataset = self.__create_dataset('test')
-        return DataLoader(dataset, **self._cfg.test_loader)
+# class PetFinderDataModule(LightningDataModule):
+#     """Data module of Petfinder profiles."""
+#     def __init__(self, train_df=None, valid_df=None, test_df=None, cfg=None):
+#         super().__init__()
+#         self._train_df = train_df
+#         self._valid_df = valid_df
+#         self._test_df = test_df
+#         self._cfg = cfg
+#         self.trans = get_default_transforms()
+#         self.ttas = get_tta_transforms()
+#
+#     def __create_dataset(self, mode='train'):
+#         if mode == 'train':
+#             return PetFinderDataset(self._train_df, train=True, transform=self.trans['train'])
+#         elif mode == 'valid':
+#             return PetFinderDataset(self._valid_df, train=True, transform=self.trans['valid'])
+#         elif mode == 'test':
+#             return PetFinderDataset(self._test_df, train=False, transform=self.trans['test'], tta=self.ttas)
+#         elif mode == 'predict':
+#             return PetFinderDataset(self._train_df, train=False, predict=True, transform=self.trans['test'], tta=self.ttas)
+#
+#     def train_dataloader(self):
+#         dataset = self.__create_dataset('train')
+#         return DataLoader(dataset, **self._cfg.train_loader)
+#
+#     def val_dataloader(self):
+#         dataset = self.__create_dataset('valid')
+#         return DataLoader(dataset, **self._cfg.valid_loader)
+#
+#     def predict_dataloader(self):
+#         dataset = self.__create_dataset('predict')
+#         return DataLoader(dataset, **self._cfg.test_loader)
+#
+#     def test_dataloader(self):
+#         dataset = self.__create_dataset('test')
+#         return DataLoader(dataset, **self._cfg.test_loader)
 
 
 
 
 
 if __name__ == '__main__':
-    pass
+    a = AutoTokenizer.from_pretrained('klue/roberta-large')
