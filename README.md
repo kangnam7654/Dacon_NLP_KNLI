@@ -1,4 +1,24 @@
-# Dacon_KNLP_Classification
+# Dacon_KNLI
+
+## About this project
+```
+This project launched in Dacon, Korean data scientists' community, where similar to kaggle.
+Purpose of participation of the project is to improve myself.
+The project's subject is kind of basic NLI(Natural Language Inference).
+I used roBERTa as base, and trained with Dacon data and kakao_knli_dataset.
+```
+
+## Used
+### Model
+```
+klue/roberta-large
+```
+### Data
+```
+Dacon Data
+kakao_knli_dataset
+```
+
 ## Directory Tree
 ```bash
 📦Dacon_knli
