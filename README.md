@@ -1,5 +1,5 @@
 # Dacon_KNLP_Classification
-
+```bash
 📦Dacon_knli
  ┣ 📂configs
  ┃ ┣ 📜cfg.yaml
@@ -40,3 +40,4 @@
  ┣ 📜main.py
  ┣ 📜README.md
  ┗ 📜requirements.txt
+```
