@@ -1,6 +1,10 @@
+/.idea/
+/ckpt
+/nohups
+/submitted
+/logs
 /data
-
-
+__.py
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm+all,windows,macos
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pycharm+all,windows,macos

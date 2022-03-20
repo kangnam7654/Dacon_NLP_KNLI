@@ -1,0 +1,31 @@
+SEED: 555
+
+DATA:
+  PAIR : ['entailment', 'neutral', 'contradiction']
+  TRAIN_CSV : ./data/new_train_.csv
+#  TRAIN_CSV : ./data/train_data.csv
+  TEST_CSV : ./data/test_data.csv
+MODEL:
+  NAME: 'klue/roberta-large'
+  CRITERIA: CrossEntropy
+  OPTIMIZER: SGD-Nesterov
+  LR: 0.0002
+  MOMENTUM: 0.9
+  WEIGHT_DECAY: 0.001
+#  CHECKPOINT: ./ckpt/klue/roberta-large.ckpt # null == None, 불러올 모델
+  CHECKPOINT: null
+  N_CLASSES: 3 # class 개수
+TRAIN:
+  BATCH_SIZE: 12
+  SEED: 2022
+  EPOCHS: 100
+  EARLYSTOP_PATIENT: 10
+  DEVICE: null
+  MODEL_SAVE_PATH: './ckpt/template/best_large.pth'
+  LOGGING_SEP: '|'
+  LOGGING_SAVE_PATH: './log_large.txt'
+  VALID_SPLIT_SIZE: 0.2
+VALID:
+  BATCH_SIZE: 12
+TEST:
+  BATCH_SIZE: 1
